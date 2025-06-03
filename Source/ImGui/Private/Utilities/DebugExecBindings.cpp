@@ -4,6 +4,7 @@
 
 #include "ImGuiModuleSettings.h"
 
+#include <GameFramework/InputSettings.h>
 #include <GameFramework/PlayerInput.h>
 #include <UObject/UObjectIterator.h>
 
@@ -86,7 +87,8 @@ namespace DebugExecBindings
 		const FKeyBind KeyBind = CreateKeyBind(KeyInfo, Command);
 
 		// Update default player input, so changes will be visible in all PIE sessions created after this point.
-		if (UPlayerInput* DefaultPlayerInput = GetMutableDefault<UPlayerInput>())
+		const UInputSettings* InputSettings = GetDefault<UInputSettings>();
+		if (UPlayerInput* DefaultPlayerInput = GetMutableDefault<UPlayerInput>(InputSettings->GetDefaultPlayerInputClass()))
 		{
 			UpdatePlayerInput(DefaultPlayerInput, KeyBind);
 		}

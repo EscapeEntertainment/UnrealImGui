@@ -11,6 +11,10 @@
 
 #include <imgui.h>
 
+// MSVC warnings
+#ifdef _MSC_VER
+#pragma warning (disable: 4996) // 'This function or variable may be unsafe': strcpy, strdup, sprintf, vsnprintf, sscanf, fopen
+#endif
 
 // TODO: Refactor ImGui Context Manager, to handle different types of worlds.
 
@@ -74,6 +78,9 @@ FImGuiContextManager::FImGuiContextManager(FImGuiModuleSettings& InSettings)
 
 FImGuiContextManager::~FImGuiContextManager()
 {
+	// Early dealloc of contexts for clean shutdown order
+	Contexts.Reset();
+
 	Settings.OnDPIScaleChangedDelegate.RemoveAll(this);
 
 	// Order matters because contexts can be created during World Tick Start events.
@@ -275,7 +282,8 @@ void FImGuiContextManager::BuildFontAtlas(const TMap<FName, TSharedPtr<ImFontCon
 				strncpy(CustomFontConfig->Name, TCHAR_TO_ANSI(*CustomFontName.ToString()), 40);
 			}
 
-			FontAtlas.AddFont(CustomFontConfig.Get());
+			ImFont* font{FontAtlas.AddFont(CustomFontConfig.Get())};
+			font->ContainerAtlas = &FontAtlas;
 		}
 
 		unsigned char* Pixels;

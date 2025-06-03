@@ -10,13 +10,13 @@
 	"DocsURL": "",
 	"MarketplaceURL": "",
 	"SupportURL": "",
-	"CanContainContent": false,
+	"CanContainContent": true,
 	"IsBetaVersion": false,
 	"Installed": false,
 	"Modules": [
 		{
 			"Name": "ImGui",
-			"Type": "Runtime",
+			"Type": "DeveloperTool",
 			"LoadingPhase": "PreDefault"
 		}
 	]

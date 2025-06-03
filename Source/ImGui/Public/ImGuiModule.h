@@ -8,6 +8,7 @@
 
 #include <Modules/ModuleManager.h>
 
+class UTexture;
 
 class FImGuiModule : public IModuleInterface
 {
@@ -92,6 +93,22 @@ public:
 	 * @returns Handle to a registered texture or invalid handle if resources could not be found or were not valid
 	 */
 	virtual FImGuiTextureHandle FindTextureHandle(const FName& Name);
+
+	/**
+	 * If it exists, get a texture object with given resource name.
+	 *
+	 * @param Name - Resource name of a texture to find
+	 * @returns The texture object, or nullptr if not found
+	 */
+	virtual UTexture* FindTexture(const FName& Name);
+
+	/**
+	 * If it exists, get a texture object with given texture handle.
+	 *
+	 * @param Name - Resource name of a texture to find
+	 * @returns The texture object, or nullptr if not found
+	 */
+	virtual UTexture* FindTexture(const FImGuiTextureHandle& Handle);
 
 	/**
 	 * Register texture and create its Slate resources. If texture with that name already exists then it may be updated

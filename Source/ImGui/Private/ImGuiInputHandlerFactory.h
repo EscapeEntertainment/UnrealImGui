@@ -13,7 +13,7 @@ class FImGuiInputHandlerFactory
 {
 public:
 
-	static UImGuiInputHandler* NewHandler(const FSoftClassPath& HandlerClassReference, FImGuiModuleManager* ModuleManager, UGameViewportClient* GameViewport, int32 ContextIndex);
+	static UImGuiInputHandler* NewHandler(const FSoftClassPath& HandlerClassReference, FImGuiModuleManager* ModuleManager, UGameViewportClient* GameViewport, int32 ContextIndex, TSharedRef<class SImGuiWidget> Widget);
 
 	static void ReleaseHandler(UImGuiInputHandler* Handler);
 };

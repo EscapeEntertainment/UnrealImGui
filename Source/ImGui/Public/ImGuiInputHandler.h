@@ -2,10 +2,11 @@
 
 #pragma once
 
-#include <CoreMinimal.h>
-#include <Input/Reply.h>
-#include <UObject/Object.h>
-#include <UObject/WeakObjectPtr.h>
+#include "CoreMinimal.h"
+#include "Framework/Application/IInputProcessor.h"
+#include "Input/Reply.h"
+#include "UObject/Object.h"
+#include "UObject/WeakObjectPtr.h"
 
 #include "ImGuiInputHandler.generated.h"
 
@@ -134,15 +135,12 @@ public:
 
 protected:
 
-	/** Copy state of modifier keys to input state. */
-	void CopyModifierKeys(const FInputEvent& InputEvent);
-
 	/**
 	 * Checks whether this is a key event that can open console.
 	 * @param KeyEvent - Key event to test.
 	 * @returns True, if this key event can open console.
 	 */
-	bool IsConsoleEvent(const FKeyEvent& KeyEvent) const;
+	static bool IsConsoleEvent(const FKeyEvent& KeyEvent);
 
 #if WITH_EDITOR
 	/**
@@ -174,9 +172,9 @@ private:
 
 	void OnPostImGuiUpdate();
 
-	void Initialize(FImGuiModuleManager* InModuleManager, UGameViewportClient* InGameViewport, int32 InContextIndex);
+	void Initialize(FImGuiModuleManager* InModuleManager, UGameViewportClient* InGameViewport, int32 InContextIndex, TSharedRef<class SImGuiWidget> Widget);
 
-	virtual void BeginDestroy() override;
+	void Deinitialize();
 
 	class FImGuiInputState* InputState = nullptr;
 
@@ -188,6 +186,8 @@ private:
 
 	TWeakObjectPtr<UGameViewportClient> GameViewport;
 
+	TSharedPtr<class FImGuiInputProcessor> InputProcessor;
+
 	int32 ContextIndex = -1;
 
 #if WITH_EDITOR
@@ -196,3 +196,16 @@ private:
 
 	friend class FImGuiInputHandlerFactory;
 };
+
+class FImGuiInputProcessor : public IInputProcessor
+{
+public:
+	FImGuiInputProcessor(TSharedRef<class SImGuiWidget> InOwnerWidget);
+	void Tick(const float DeltaTime, FSlateApplication& SlateApp, TSharedRef<ICursor> Cursor) override {};
+	bool HandleKeyDownEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent) override;
+	bool HandleKeyUpEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent) override;
+
+private:
+	TWeakPtr<class SImGuiWidget> OwnerWidget;
+};
+

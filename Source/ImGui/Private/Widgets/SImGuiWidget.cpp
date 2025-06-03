@@ -11,6 +11,7 @@
 #include "ImGuiModuleManager.h"
 #include "ImGuiModuleSettings.h"
 #include "TextureManager.h"
+#include "UnrealClient.h"
 #include "Utilities/Arrays.h"
 #include "VersionCompatibility.h"
 
@@ -112,6 +113,9 @@ void SImGuiWidget::Construct(const FArguments& InArgs)
 	// Initialize state.
 	UpdateVisibility();
 	UpdateMouseCursor();
+	
+	// Support Slate Global Invalidation.
+	ForceVolatile(true);
 
 	ChildSlot
 	[
@@ -157,16 +161,24 @@ FReply SImGuiWidget::OnKeyChar(const FGeometry& MyGeometry, const FCharacterEven
 	return InputHandler->OnKeyChar(CharacterEvent);
 }
 
-FReply SImGuiWidget::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent)
+FReply SImGuiWidget::OnKeyDown_Indirect(const FKeyEvent& KeyEvent)
 {
-	UpdateCanvasControlMode(KeyEvent);
-	return InputHandler->OnKeyDown(KeyEvent);
+	if (HasKeyboardFocus())
+	{
+		UpdateCanvasControlMode(KeyEvent);
+		return InputHandler->OnKeyDown(KeyEvent);
+	}
+	return FReply::Unhandled();
 }
 
-FReply SImGuiWidget::OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent)
+FReply SImGuiWidget::OnKeyUp_Indirect(const FKeyEvent& KeyEvent)
 {
-	UpdateCanvasControlMode(KeyEvent);
-	return InputHandler->OnKeyUp(KeyEvent);
+	if (HasKeyboardFocus())
+	{
+		UpdateCanvasControlMode(KeyEvent);
+		return InputHandler->OnKeyUp(KeyEvent);
+	}
+	return FReply::Unhandled();
 }
 
 FReply SImGuiWidget::OnAnalogValueChanged(const FGeometry& MyGeometry, const FAnalogInputEvent& AnalogInputEvent)
@@ -281,7 +293,7 @@ void SImGuiWidget::CreateInputHandler(const FSoftClassPath& HandlerClassReferenc
 
 	if (!InputHandler.IsValid())
 	{
-		InputHandler = FImGuiInputHandlerFactory::NewHandler(HandlerClassReference, ModuleManager, GameViewport.Get(), ContextIndex);
+		InputHandler = FImGuiInputHandlerFactory::NewHandler(HandlerClassReference, ModuleManager, GameViewport.Get(), ContextIndex, SharedThis(this));
 	}
 }
 
@@ -651,15 +663,11 @@ int32 SImGuiWidget::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeo
 			DrawList.CopyVertexData(VertexBuffer, ImGuiToScreen);
 #endif // ENGINE_COMPATIBILITY_LEGACY_CLIPPING_API
 
-			int IndexBufferOffset = 0;
 			for (int CommandNb = 0; CommandNb < DrawList.NumCommands(); CommandNb++)
 			{
 				const auto& DrawCommand = DrawList.GetCommand(CommandNb, ImGuiToScreen);
 
-				DrawList.CopyIndexData(IndexBuffer, IndexBufferOffset, DrawCommand.NumElements);
-
-				// Advance offset by number of copied elements to position it for the next command.
-				IndexBufferOffset += DrawCommand.NumElements;
+				DrawList.CopyIndexData(IndexBuffer, DrawCommand.IndexOffset, DrawCommand.NumElements);
 
 				// Get texture resource handle for this draw command (null index will be also mapped to a valid texture).
 				const FSlateResourceHandle& Handle = ModuleManager->GetTextureManager().GetTextureHandle(DrawCommand.TextureId);

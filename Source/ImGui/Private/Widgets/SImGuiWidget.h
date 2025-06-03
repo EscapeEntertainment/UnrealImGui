@@ -52,9 +52,9 @@ public:
 
 	virtual FReply OnKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& CharacterEvent) override;
 
-	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent) override;
+	virtual FReply OnKeyDown_Indirect(const FKeyEvent& KeyEvent);
 
-	virtual FReply OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent) override;
+	virtual FReply OnKeyUp_Indirect(const FKeyEvent& KeyEvent);
 
 	virtual FReply OnAnalogValueChanged(const FGeometry& MyGeometry, const FAnalogInputEvent& AnalogInputEvent) override;
 

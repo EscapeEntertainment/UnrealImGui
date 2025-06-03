@@ -8,8 +8,8 @@
 #include "ImGuiModuleManager.h"
 #include "ImGuiModuleSettings.h"
 #include "VersionCompatibility.h"
+#include "Widgets/SImGuiWidget.h"
 
-#include <Engine/Console.h>
 #include <Framework/Application/SlateApplication.h>
 #include <GameFramework/InputSettings.h>
 #include <InputCoreTypes.h>
@@ -45,68 +45,56 @@ FReply UImGuiInputHandler::OnKeyDown(const FKeyEvent& KeyEvent)
 		bool bConsume = false;
 		if (InputState->IsGamepadNavigationEnabled())
 		{
-			InputState->SetGamepadNavigationKey(KeyEvent, true);
+			InputState->SetKeyDown(KeyEvent, true);
 			bConsume = !ModuleManager->GetProperties().IsGamepadInputShared();
 		}
 
 		return ToReply(bConsume);
 	}
-	else
+
+	// Ignore console events, so we don't block it from opening.
+	if (IsConsoleEvent(KeyEvent))
 	{
-		// Ignore console events, so we don't block it from opening.
-		if (IsConsoleEvent(KeyEvent))
-		{
-			return ToReply(false);
-		}
+		return ToReply(false);
+	}
 
 #if WITH_EDITOR
-		// If there is no active ImGui control that would get precedence and this key event is bound to a stop play session
-		// command, then ignore that event and let the command execute.
-		if (!HasImGuiActiveItem() && IsStopPlaySessionEvent(KeyEvent))
-		{
-			return ToReply(false);
-		}
+	// If there is no active ImGui control that would get precedence and this key event is bound to a stop play session
+	// command, then ignore that event and let the command execute.
+	if (!HasImGuiActiveItem() && IsStopPlaySessionEvent(KeyEvent))
+	{
+		return ToReply(false);
+	}
 #endif // WITH_EDITOR
 
-		const bool bConsume = !ModuleManager->GetProperties().IsKeyboardInputShared();
+	const bool bConsume = !ModuleManager->GetProperties().IsKeyboardInputShared();
 
-		// With shared input we can leave command bindings for DebugExec to handle, otherwise we need to do it here.
-		if (bConsume && IsToggleInputEvent(KeyEvent))
-		{
-			ModuleManager->GetProperties().ToggleInput();
-		}
-
-		InputState->SetKeyDown(KeyEvent, true);
-		CopyModifierKeys(KeyEvent);
-
-		InputState->KeyDownEvents.Add(KeyEvent.GetKeyCode(), KeyEvent);
-
-		return ToReply(bConsume);
+	// With shared input we can leave command bindings for DebugExec to handle, otherwise we need to do it here.
+	if (bConsume && IsToggleInputEvent(KeyEvent))
+	{
+		ModuleManager->GetProperties().ToggleInput();
 	}
+
+	InputState->SetKeyDown(KeyEvent, true);
+	return ToReply(bConsume);
 }
 
 FReply UImGuiInputHandler::OnKeyUp(const FKeyEvent& KeyEvent)
 {
-	InputState->KeyUpEvents.Add(KeyEvent.GetKeyCode(), KeyEvent);
-	
 	if (KeyEvent.GetKey().IsGamepadKey())
 	{
 		bool bConsume = false;
 		if (InputState->IsGamepadNavigationEnabled())
 		{
-			InputState->SetGamepadNavigationKey(KeyEvent, false);
+			InputState->SetKeyDown(KeyEvent, false);
 			bConsume = !ModuleManager->GetProperties().IsGamepadInputShared();
 		}
 
 		return ToReply(bConsume);
 	}
-	else
-	{
-		InputState->SetKeyDown(KeyEvent, false);
-		CopyModifierKeys(KeyEvent);
 
-		return ToReply(!ModuleManager->GetProperties().IsKeyboardInputShared());
-	}
+	InputState->SetKeyDown(KeyEvent, false);
+	return ToReply(!ModuleManager->GetProperties().IsKeyboardInputShared());
 }
 
 FReply UImGuiInputHandler::OnAnalogValueChanged(const FAnalogInputEvent& AnalogInputEvent)
@@ -135,7 +123,7 @@ FReply UImGuiInputHandler::OnMouseButtonDown(const FPointerEvent& MouseEvent)
 		FImGuiContextProxy* Proxy = ModuleManager->GetContextManager().GetContextProxy(0);
 		if (Proxy)
 		{
-			GEngine->AddOnScreenDebugMessage(15, 10, Proxy->WantsMouseCapture() ? FColor::Green : FColor::Red, TEXT("Handler Down"));
+			//GEngine->AddOnScreenDebugMessage(15, 10, Proxy->WantsMouseCapture() ? FColor::Green : FColor::Red, TEXT("Handler Down"));
 			return ToReply(Proxy->WantsMouseCapture());
 		}
 	}
@@ -224,7 +212,6 @@ void UImGuiInputHandler::OnGamepadInputDisabled()
 	if (bGamepadInputEnabled)
 	{
 		bGamepadInputEnabled = false;
-		InputState->ResetGamepadNavigation();
 	}
 }
 
@@ -247,14 +234,7 @@ void UImGuiInputHandler::OnMouseInputDisabled()
 	}
 }
 
-void UImGuiInputHandler::CopyModifierKeys(const FInputEvent& InputEvent)
-{
-	InputState->SetControlDown(InputEvent.IsControlDown());
-	InputState->SetShiftDown(InputEvent.IsShiftDown());
-	InputState->SetAltDown(InputEvent.IsAltDown());
-}
-
-bool UImGuiInputHandler::IsConsoleEvent(const FKeyEvent& KeyEvent) const
+bool UImGuiInputHandler::IsConsoleEvent(const FKeyEvent& KeyEvent)
 {
 	// Checking modifiers is based on console implementation.
 	const bool bModifierDown = KeyEvent.IsControlDown() || KeyEvent.IsShiftDown() || KeyEvent.IsAltDown() || KeyEvent.IsCommandDown();
@@ -329,7 +309,7 @@ void UImGuiInputHandler::OnPostImGuiUpdate()
 	InputState->SetGamepad(PlatformApplication.IsValid() && PlatformApplication->IsGamepadAttached());
 }
 
-void UImGuiInputHandler::Initialize(FImGuiModuleManager* InModuleManager, UGameViewportClient* InGameViewport, int32 InContextIndex)
+void UImGuiInputHandler::Initialize(FImGuiModuleManager* InModuleManager, UGameViewportClient* InGameViewport, int32 InContextIndex, TSharedRef<SImGuiWidget> Widget)
 {
 	ModuleManager = InModuleManager;
 	GameViewport = InGameViewport;
@@ -356,11 +336,14 @@ void UImGuiInputHandler::Initialize(FImGuiModuleManager* InModuleManager, UGameV
 			TEXT("PIE feature allowing execution of stop command in ImGui input mode will be disabled."));
 	}
 #endif // WITH_EDITOR
+
+	InputProcessor = MakeShared<FImGuiInputProcessor>(Widget);
+	FSlateApplication::Get().RegisterInputPreProcessor(InputProcessor, ModuleManager->GetSettings().GetInputProcessorPriority());
 }
 
-void UImGuiInputHandler::BeginDestroy()
+void UImGuiInputHandler::Deinitialize()
 {
-	Super::BeginDestroy();
+	FSlateApplication::Get().UnregisterInputPreProcessor(InputProcessor);
 
 	// To catch leftovers from modules shutdown during PIE session.
 	extern FImGuiModuleManager* ImGuiModuleManager;
@@ -370,3 +353,25 @@ void UImGuiInputHandler::BeginDestroy()
 	}
 }
 
+FImGuiInputProcessor::FImGuiInputProcessor(TSharedRef<SImGuiWidget> InOwnerWidget)
+	: OwnerWidget(InOwnerWidget)
+{
+}
+
+bool FImGuiInputProcessor::HandleKeyDownEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent)
+{
+	if (OwnerWidget.IsValid())
+	{
+		return OwnerWidget.Pin()->OnKeyDown_Indirect(InKeyEvent).IsEventHandled();
+	}
+	return false;
+}
+
+bool FImGuiInputProcessor::HandleKeyUpEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent)
+{
+	if (OwnerWidget.IsValid())
+	{
+		return OwnerWidget.Pin()->OnKeyUp_Indirect(InKeyEvent).IsEventHandled();
+	}
+	return false;
+}

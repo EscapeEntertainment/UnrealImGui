@@ -6,6 +6,12 @@
 #include <Framework/Application/SlateApplication.h>
 
 #include <algorithm>
+#include "Misc/EngineVersionComparison.h"
+#if UE_VERSION_OLDER_THAN(5, 2, 0)
+#include "RHI.h"
+#else
+#include "RHITypes.h"
+#endif
 
 
 void FTextureManager::InitializeErrorTexture(const FColor& Color)
@@ -158,6 +164,11 @@ const FSlateResourceHandle& FTextureManager::FTextureEntry::GetResourceHandle() 
 		CachedResourceHandle = FSlateApplication::Get().GetRenderer()->GetResourceHandle(Brush);
 	}
 	return CachedResourceHandle;
+}
+
+UTexture* FTextureManager::FTextureEntry::GetTexture() const
+{
+	return Cast<UTexture>(Brush.GetResourceObject());
 }
 
 void FTextureManager::FTextureEntry::Reset(bool bReleaseResources)
